@@ -16,6 +16,43 @@
 	Note that very limited to no support will be provided.
 ]]
 
+function json_decode(json_str)
+    json_str = json_str:gsub("%s", "")
+    local parse_value
+    function parse_value(str)
+        if str:match("^-?%d+%.?%d*$") then
+            return tonumber(str)
+        elseif str:match("^\".*\"$") then
+            return str:sub(2, -2)
+        elseif str == "true" then
+            return true
+        elseif str == "false" then
+            return false
+        elseif str == "null" then
+            return nil
+        elseif str:match("^%[.*%]$") then
+            local arr = {}
+            local inner_str = str:sub(2, -2)
+            for value in inner_str:gmatch("([^,]+)") do
+                table.insert(arr, parse_value(value))
+            end
+            return arr
+        elseif str:match("^%{.*%}$") then
+            local obj = {}
+            local inner_str = str:sub(2, -2)
+            for pair in inner_str:gmatch("([^,]+)") do
+                local key, value = pair:match("^\"(.-)\"%:%s*(.+)$")
+                obj[key] = parse_value(value)
+            end
+            return obj
+        else
+            error("Некорректный JSON")
+        end
+    end
+
+    return parse_value(json_str)
+end
+
 local nodes = {}
 local selection
 local clonerefs = function(...) return ... end
@@ -10378,7 +10415,7 @@ Main = (function()
 	Main.LoadSettings = function()
 		local s,data = pcall(env.readfile or error,"DexSettings.json")
 		if s and data and data ~= "" then
-			local s,decoded = service.HttpService:JSONDecode(data)
+			local s,decoded = json_decode(data)
 			if s and decoded then
 				for i,v in next,decoded do
 
@@ -10419,7 +10456,7 @@ Main = (function()
 					Main.DepsVersionData[1] = ""
 				end
 			end
-			rawAPI = game.HttpService:JSONDecode(game:HttpGet("https://raw.githubusercontent.com/InfernusScripts/Fixed-Scripts/main/DexV5/RawAPI.json"))
+			rawAPI = json_decode(game:HttpGet("https://raw.githubusercontent.com/InfernusScripts/Fixed-Scripts/main/DexV5/RawAPI.json"))
 		else
 			if script:FindFirstChild("API") then
 				rawAPI = require(script.API)
@@ -10429,7 +10466,7 @@ Main = (function()
 		end
 		Main.RawAPI = rawAPI
 		pcall(function()
-			api = service.HttpService:JSONDecode(rawAPI)
+			api = json_decode(rawAPI)
 		end)
 		if not api then
 			return error("API Not exists!")
